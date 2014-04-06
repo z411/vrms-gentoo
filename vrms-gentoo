@@ -1,0 +1,234 @@
+#!/usr/bin/perl
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+
+use strict;
+use warnings;
+
+use Term::ANSIColor;
+use Getopt::Long;
+
+my $desired_group = "FREE";
+my %license_groups = ();
+
+my $nonfree = 0;
+my %nonfree_packages = ();
+my $maybe_nonfree = 0;
+my %maybe_nonfree_packages = ();
+
+my $total = 0;
+
+my $hostname = "";
+chop( $hostname = `uname -n`);
+
+# Options
+my $help = 0;
+my $quiet = 0;
+my $strict = 0;
+my $no_color = 0;
+my $show_version = 0;
+
+sub usage() {
+    print <<EOF;
+Usage: vrms-gentoo [OPTIONS] ...
+
+ -h, --help         display this help message
+ -q, --quiet        minimal output
+ -s, --strict       use \@FSF-APPROVED instead of \@FREE group as reference
+ -C, --no-color     turn off colors
+ -V, --version      display version info
+
+EOF
+}
+
+# Parse command line options
+GetOptions('h|help' => \$help,
+        'q|quiet' => \$quiet,
+        's|strict' => \$strict,
+        'C|no-color' => \$no_color,
+        'V|version' => \$show_version);
+
+if($help)
+{
+    usage();
+    exit 0;
+}
+$desired_group = "FSF-APPROVED" if($strict);
+
+# is_free_license: Returns 1 if the provided license is free,
+# 0 otherwise.
+sub is_free_license
+{
+    my $package_license = shift;
+    my $group = shift;
+
+    # We iterate over the license group
+    # hoping we find the license in it
+    foreach( @{ $license_groups{$group} } )
+    {
+        if( $_ =~ /^@/ )
+        {
+            # Recursion
+            my $rgroup = substr $_, 1;
+            return 1 if( is_free_license( $package_license, $rgroup ) );
+        }
+        else
+        {
+            # Compare
+            return 1 if( $package_license eq $_ );
+        }
+    }
+
+    # Wasn't found, must be non-free
+    return 0;
+}
+
+# is_free_package: Parses a space separated list of licenses
+# and returns 1 or 2 if there's a non-free license in it
+#
+# Return values:
+# 0: non-free
+# 1: free
+# 2: might not be free
+sub is_free_package {
+    my $license = shift;
+    my @licenses = split / /, $license;
+    
+    my $or = 0;
+    
+    # We separate the space separated list and
+    # check if any of them is non-free
+    foreach(@licenses) {
+        if ( $_ eq '||' ) { $or = 1; next; };
+        next if ( $_ eq '(' );
+        next if ( $_ eq ')' );
+
+        if ( !is_free_license($_, $desired_group) ) {
+            return (2, $_) if $or;
+            return (0, $_);
+            last;
+        }
+    }
+    return (1, '');
+}
+
+# Parse portage's license_groups file to see which licenses
+# are considered free
+open LGF, '<', "/usr/portage/profiles/license_groups" || die('No license groups found. Are you on Gentoo?');
+while( my $line = <LGF> ) {
+    next unless $line =~ /\S/;
+    next if $line =~ /^#/;
+
+    chomp $line;
+    my @words = split / /, $line;
+    my $group = shift @words;
+    $license_groups{$group} = \@words;
+}
+close LGF;
+
+# Search package directory for all installed packages
+# and read the LICENSE file of each package.
+# We pass the contents to is_free_package sub and build a list
+# of non-free packages, if any.
+opendir(D, "/var/db/pkg") || die('No package directory found. Are you on Gentoo?');
+
+while(my $category = readdir(D)) {
+    next if ($category eq '.' || $category eq '..' );
+
+    opendir(C, "/var/db/pkg/$category");
+    while(my $package = readdir(C)) {
+        # Ignore dotfiles
+        next if($package eq '.' || $package eq '..');
+        
+        my $license;
+        open(LFH, '<', "/var/db/pkg/$category/$package/LICENSE") || next;
+        sysread( LFH, $license, 100 );
+        chomp($license);
+        my ($result, $nonfree_license) = is_free_package($license);
+
+        my $pkgname;
+        
+        $pkgname = colored("$category/", 'bold white') . colored("$package", 'bold cyan') if (!$no_color);
+        $pkgname = "$category/$package" if ($no_color);
+
+        if ($result == 0)
+        {
+            $nonfree++;
+            $nonfree_packages{$pkgname} = $nonfree_license;
+        }
+        elsif ($result == 2)
+        {
+            $maybe_nonfree++;
+            $maybe_nonfree_packages{$pkgname} = $nonfree_license;
+        }
+
+        close(LFH);
+        $total++;
+    }
+    closedir(C);
+}
+closedir(D);
+
+# List the non-free packages
+if( $nonfree )
+{
+    print '          ', colored('Non-free', 'bold red'),
+            colored(' packages in ', 'bold white'),
+            colored($hostname, 'bold green'), "\n\n" if (!$no_color);
+    print "          Non-free packages in $hostname\n\n" if ($no_color);
+    
+    foreach my $pkg (sort keys (%nonfree_packages) )
+    {
+        my $license = $nonfree_packages{$pkg};
+        print "$pkg ($license)\n";
+    }
+}
+
+print "\n";
+
+# List the possibly non-free packages
+if( $maybe_nonfree )
+{
+    print '      ', colored('Possibly non-free', 'bold yellow'),
+            colored(' packages in ', 'bold white'),
+            colored($hostname, 'bold green'), "\n\n" if (!$no_color);
+    print "      Possibly non-free packages in $hostname\n\n" if ($no_color);
+
+    foreach my $pkg (sort keys (%maybe_nonfree_packages) )
+    {
+        my $license = $maybe_nonfree_packages{$pkg};
+        print "$pkg ($license)\n";
+    }
+}
+
+print "\n";
+
+# Show percentages
+if( $nonfree )
+{
+    my $nonfree_percentage = $nonfree * 100 / $total;
+    printf "  %d non-free packages, %2.1f%% of %d installed packages.\n",
+        $nonfree, $nonfree_percentage, $total;
+}
+
+if( $maybe_nonfree )
+{
+    my $maybe_nonfree_percentage = $maybe_nonfree * 100 / $total;
+    printf "  %d possibly non-free packages, %2.1f%% of %d installed packages.\n",
+        $maybe_nonfree, $maybe_nonfree_percentage, $total;
+}
+
+# Congratulations if there are no non-free packages at all
+if( !$nonfree && !$maybe_nonfree)
+{
+    print "No non-free packages installed on $hostname!  rms would be proud.\n";
+}
