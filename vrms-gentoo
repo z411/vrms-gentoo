@@ -142,7 +142,8 @@ close LGF;
 opendir(D, "/var/db/pkg") || die('No package directory found. Are you on Gentoo?');
 
 while(my $category = readdir(D)) {
-    next if ($category eq '.' || $category eq '..' );
+    # Virtual packages don't have license.
+    next if ($category eq '.' || $category eq '..' || $category eq 'virtual' );
 
     opendir(C, "/var/db/pkg/$category");
     while(my $package = readdir(C)) {
@@ -150,7 +151,7 @@ while(my $category = readdir(D)) {
         next if($package eq '.' || $package eq '..');
         
         my $license;
-        open(LFH, '<', "/var/db/pkg/$category/$package/LICENSE") || next;
+        open(LFH, '<', "/var/db/pkg/$category/$package/LICENSE");
         sysread( LFH, $license, 100 );
         chomp($license);
         my ($result, $nonfree_license) = is_free_package($license);
