@@ -41,7 +41,7 @@ my $show_version = 0;
 
 sub usage() {
     print <<EOF;
-Usage: vrms-gentoo [OPTIONS] ...
+Usage: $0 [OPTIONS] ...
 
  -h, --help         display this help message
  -q, --quiet        minimal output
