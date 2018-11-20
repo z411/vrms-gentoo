@@ -123,7 +123,7 @@ sub is_free_package {
     return (1, '');
 }
 
-printf "Calculating...";
+printf "Scanning packages...";
 
 # Parse portage's license_groups file to see which licenses
 # are considered free
