@@ -16,6 +16,7 @@ use warnings;
 
 $| = 1;
 
+use List::Util qw(any);
 use Term::ANSIColor;
 use Getopt::Long;
 
@@ -146,8 +147,11 @@ close LGF;
 opendir(D, "/var/db/pkg") || die('No package directory found. Are you on Gentoo?');
 
 while(my $category = readdir(D)) {
-    # Virtual packages don't have license.
-    next if ($category eq '.' || $category eq '..' || $category eq 'virtual' );
+    # Skip categories that don't have a license
+    next if any {$_ eq $category} (
+        ".", "..",
+        "virtual", "acct-user", "acct-group"
+    );
 
     opendir(C, "/var/db/pkg/$category");
     while(my $package = readdir(C)) {
