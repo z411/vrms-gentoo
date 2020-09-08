@@ -33,6 +33,14 @@ my $total = 0;
 my $hostname = "";
 chop( $hostname = `uname -n`);
 
+my $license_groups_location = "";
+chop( $license_groups_location = `portageq get_repo_path / gentoo`);
+if ( $? == -1 )
+{ 
+    die('Portageq not found. Are you on Gentoo?');
+}
+$license_groups_location = "$license_groups_location/profiles/license_groups";
+
 # Options
 my $help = 0;
 my $quiet = 0;
@@ -128,7 +136,7 @@ printf "Scanning packages...";
 
 # Parse portage's license_groups file to see which licenses
 # are considered free
-open LGF, '<', "/usr/portage/profiles/license_groups" || die('No license groups found. Are you on Gentoo?');
+open LGF, '<', $license_groups_location || die('No license groups found. Are you on Gentoo?');
 while( my $line = <LGF> ) {
     next unless $line =~ /\S/;
     next if $line =~ /^#/;
