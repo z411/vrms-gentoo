@@ -136,7 +136,7 @@ printf "Scanning packages...";
 
 # Parse portage's license_groups file to see which licenses
 # are considered free
-open LGF, '<', $license_groups_location || die('No license groups found. Are you on Gentoo?');
+open LGF, '<', $license_groups_location or die('No license groups found. Are you on Gentoo?');
 while( my $line = <LGF> ) {
     next unless $line =~ /\S/;
     next if $line =~ /^#/;
