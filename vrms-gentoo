@@ -168,7 +168,7 @@ while(my $category = readdir(D)) {
         
         my $license;
         open(LFH, '<', "/var/db/pkg/$category/$package/LICENSE");
-        sysread( LFH, $license, 100 );
+        sysread( LFH, $license, 1024 );
         chomp($license);
         my ($result, $nonfree_license) = is_free_package($license);
 
