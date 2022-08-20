@@ -210,9 +210,10 @@ if( $nonfree )
         my $license = $nonfree_packages{$pkg};
         print "$pkg ($license)\n";
     }
+
+    print "\n";
 }
 
-print "\n";
 
 # List the possibly non-free packages
 if( $maybe_nonfree )
@@ -227,9 +228,9 @@ if( $maybe_nonfree )
         my $license = $maybe_nonfree_packages{$pkg};
         print "$pkg ($license)\n";
     }
-}
 
-print "\n";
+    print "\n";
+}
 
 # Show percentages
 if( $nonfree )
